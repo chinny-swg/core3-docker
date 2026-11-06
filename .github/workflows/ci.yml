@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell scripts
+        run: shellcheck -x *.sh
+      - name: Compose file
+        run: docker compose config -q
+
+  image:
+    # Builds Core3's base image and the overlay exactly as ./build.sh does for a player
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build swgemu/core3-dev and core3-local
+        run: ./build.sh
+      - name: Java is installed
+        run: docker run --rm --entrypoint java core3-local:latest -version
+      - name: CMake finds Java the way Core3's CMakeLists.txt asks for it
+        run: |
+          docker run --rm --entrypoint bash core3-local:latest -c '
+            set -e
+            mkdir /probe && cd /probe
+            printf "%s\n" "cmake_minimum_required(VERSION 3.10)" "project(probe NONE)" \
+              "find_package(Java 1.5 COMPONENTS Runtime REQUIRED)" > CMakeLists.txt
+            cmake .'
+      - name: Entrypoint is the overlay's
+        run: |
+          test "$(docker image inspect --format '{{json .Config.Entrypoint}}' core3-local:latest)" = \
+            '["/usr/local/bin/core3-docker-entrypoint"]'

@@ -1,0 +1,36 @@
+# The Core3 server container for playing on this PC. Build the image first with ./build.sh and
+# load your .tre files with ./load-tre.sh, then: docker compose up -d
+services:
+  core3:
+    image: core3-local:latest
+    container_name: swgemu-core3
+    hostname: swgemu-core3
+    # Core3's entrypoint ends in an interactive shell; keep it open so the container stays up
+    stdin_open: true
+    tty: true
+    cap_add:
+      - SYS_PTRACE # the in-container `run` starts core3 under gdb
+    restart: unless-stopped
+    environment:
+      GALAXY_NAME: swgemu-core3
+      # The address the login server hands the client for the galaxy: this PC
+      GALAXY_ADDRESS: 127.0.0.1
+      # First boot clones Core3 from here (Core3's default is upstream swgemu)
+      REPO_PUBLIC_URL: https://github.com/chinny-swg
+      REPO_PUBLIC_BRANCH: unstable
+    ports:
+      - "44453:44453/udp" # login
+      - "44462:44462/udp" # ping
+      - "44463:44463/udp" # zone
+      - "44455:44455/tcp" # status
+    volumes:
+      - shared-tre:/tre:ro
+      - swgemu-core3:/home/swgemu
+
+volumes:
+  # Filled by ./load-tre.sh; same name Core3's own docker/run.sh uses
+  shared-tre:
+    name: shared-tre
+  # Source, compiled server, MariaDB data and config: your galaxy. Don't delete it.
+  swgemu-core3:
+    name: swgemu-core3
